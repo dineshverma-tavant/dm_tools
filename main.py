@@ -191,17 +191,30 @@ if st.session_state.df is not None:
         elif view_option == "Save Data":
             st.subheader("Save Data")
             save_format = st.selectbox("Select save format", ["CSV", "Excel", "SQL Server", "Salesforce"], key="save_format")
+            total_rows = len(st.session_state.df)
+            st.info(f"Total rows in data: {total_rows}")
+            num_rows_input = st.number_input(
+                "Enter number of rows to save (leave blank for all rows)",
+                min_value=0,
+                max_value=total_rows,
+                value=0,
+                step=1,
+                key="save_num_rows"
+            )
+
+            # Determine DataFrame to save
+            df_to_save = st.session_state.df if num_rows_input == 0 else st.session_state.df.head(num_rows_input)
 
             if save_format in ["CSV", "Excel"]:
                 filename = st.text_input("Enter filename (without extension)", value="output", key="save_filename")
                 if save_format == "CSV":
                     buffer = BytesIO()
-                    st.session_state.df.to_csv(buffer, index=False)
+                    df_to_save.to_csv(buffer, index=False)
                     file_extension = "csv"
                     mime_type = "text/csv"
                 else:  # Excel
                     buffer = BytesIO()
-                    st.session_state.df.to_excel(buffer, index=False, engine="openpyxl")
+                    df_to_save.to_excel(buffer, index=False, engine="openpyxl")
                     file_extension = "xlsx"
                     mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -228,7 +241,7 @@ if st.session_state.df is not None:
                                 f"?driver={driver.replace(' ', '+')}"
                             )
                             engine = create_engine(connection_string)
-                            st.session_state.df.to_sql(table_name, engine, if_exists="replace", index=False)
+                            df_to_save.to_sql(table_name, engine, if_exists="replace", index=False)
                             st.success(f"Data saved to {table_name} in {database} on {server}")
                         except Exception as e:
                             st.error(f"Error saving to SQL Server: {str(e)}")
@@ -305,7 +318,7 @@ if st.session_state.df is not None:
                         sf = st.session_state.sf_connection
                         success_count = 0
                         error_count = 0
-                        for _, row in st.session_state.df.iterrows():
+                        for _, row in df_to_save.iterrows():
                             record = {field_mappings[col]: row[col] for col in field_mappings}
                             try:
                                 if operation == "Update" and id_column:
@@ -319,7 +332,7 @@ if st.session_state.df is not None:
                             except Exception as e:
                                 error_count += 1
                                 st.warning(f"Error processing row {row.get(id_column, 'unknown')}: {str(e)}")
-                        st.success(f"Loaded {success_count} records to {sf_object}. Errors: {error_count}")
+                        # st.success(f"Loaded {success_count} records to {sf_object}. Errors: {error_count}")
                     except Exception as e:
                         st.error(f"Error loading data to Salesforce: {str(e)}")
 
